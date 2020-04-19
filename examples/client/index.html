@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang=en>
+<head>
+<meta charset=utf-8>
+
+  <title>VPhys</title>
+  
+  <script src="//cdn.rawgit.com/dcodeIO/protobuf.js/6.8.8/dist/protobuf.min.js"></script>
+  <script src="wusocket.js"></script>
+  
+</head>
+<script>
+
+var queryDict = {}
+location.search.substr(1).split("&").forEach(function(item) {queryDict[item.split("=")[0]] = item.split("=")[1]})
+
+function ClickRequestDeviceMotionEvent () {
+  window.DeviceMotionEvent.requestPermission()
+    .then(response => {
+      if (response === 'granted') {
+		window.addEventListener('devicemotion', deviceMotionHandler, false);
+		document.getElementById("msg").innerHTML="Starting";	
+      } else {
+        document.getElementById("msg").innerHTML='DeviceMotion permissions not granted.';
+      }
+    })
+    .catch(e => {
+      console.error(e)
+    })
+}
+
+
+
+var messager;
+var socket;
+protobuf.load("vphys.proto", function(err, root) {
+    if (err)
+        throw err;
+
+    messager = root.lookupType("vphysproto.VPhysOrientation");
+
+});
+
+var last_sent = +new Date();
+
+function deviceMotionHandler(eventData) {
+	acceleration = eventData.accelerationIncludingGravity;
+	
+	if (!messager) return;
+	var now = +new Date();
+	
+	if ((now-last_sent)<2) return;
+	
+	last_sent=now;
+	
+	var payload = { x: acceleration.x, y: acceleration.y, z: acceleration.z, i: eventData.interval };
+	
+	document.getElementById("msg2").textContent =JSON.stringify(payload,undefined, '4');
+	
+	var message = messager.create(payload); 
+	var buffer = messager.encode(message).finish();
+	if (!socket.send(buffer)) {
+		//TODO: spammy
+		document.getElementById("msg").innerHTML="ERROR";
+	};
+}
+
+function Start() {
+
+  let serverid = parseInt(queryDict["serverid"]);
+  if (isNaN(serverid)) {
+	document.getElementById("msg").innerHTML="server id undefined";
+	return;
+  };
+  
+  let url = "/meta"+serverid+"vphysrelay/";
+  console.log("connecting to "+url);
+  
+  socket = new WuSocket(url);
+  socket.onopen = function() {
+		if (window.DeviceMotionEvent) {
+		  
+		  
+			if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+				safarihacks()
+			} else {
+				window.addEventListener('devicemotion', deviceMotionHandler, false);
+				document.getElementById("msg").innerHTML="Starting";				
+			}
+		  
+		  
+
+		} else {
+		  document.getElementById("msg").innerHTML = "Not supported."
+		}
+  };
+
+  socket.onmessage = function(evt) {
+    let data = evt.data;
+    document.getElementById("msg").innerHTML=data;
+  };
+}
+
+(function() {
+  if (document.readyState != "loading") {
+    Start();
+  } else {
+    document.addEventListener("DOMContentLoaded", Start);
+  }
+})();
+
+
+function safarihacks() {
+
+  if ( window.DeviceMotionEvent && typeof window.DeviceMotionEvent.requestPermission === 'function' ){
+
+      const banner = document.createElement('div')
+      banner.innerHTML = `<div style="z-index: 1; position: absolute; width: 100%; background-color:#000; color: #fff"><p style="padding: 10px">Click here to enable DeviceMotion</p></div>`
+      banner.onclick = ClickRequestDeviceMotionEvent
+      document.querySelector('body').appendChild(banner)
+  }
+}
+
+
+
+</script>
+<body>
+<div id="msg"></div>
+<pre id="msg2"></pre>
+</body>
+</html>
