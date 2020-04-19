@@ -66,27 +66,37 @@ int main(int argc, char ** argv) {
 		printf("failed to create host\n");
 		return 1;
 	}
-
+	printf("Started listening\n");
 	for (;;) {
 		WuEvent evt;
-		while (WuHostServe(host, & evt, 1)) {
+		while (WuHostServe(host, & evt, 0)) {
 			switch (evt.type) {
 			case WuEvent_ClientJoin:
 				{
-					printf("EchoServer: client join\n");
+					WuAddress claddr = WuClientGetAddress(evt.client);
+					printf("%s%s: client join: %i.%i.%i.%i\n",hostAddr,port,          
+						(claddr.host >> 24) & 0xFF,
+						(claddr.host >> 16) & 0xFF,
+						(claddr.host >> 8) & 0xFF,
+						 claddr.host & 0xFF);
 					break;
 				}
 			case WuEvent_ClientLeave:
 				{
-					printf("EchoServer: client leave\n");
+					WuAddress claddr = WuClientGetAddress(evt.client);
+					printf("%s%s: client leave: %i.%i.%i.%i\n",hostAddr,port,          
+						(claddr.host >> 24) & 0xFF,
+						(claddr.host >> 16) & 0xFF,
+						(claddr.host >> 8) & 0xFF,
+						 claddr.host & 0xFF);
 					WuHostRemoveClient(host, evt.client);
 					break;
 				}
 			case WuEvent_TextData:
 				{
-					//const char * text = (const char * ) evt.data;
-					//int32_t length = evt.length;
-					//WuHostSendText(host, evt.client, text, length);
+					const char * text = (const char * ) evt.data;
+					int32_t length = evt.length;
+					WuHostSendText(host, evt.client, text, length);
 
 					break;
 				}
