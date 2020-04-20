@@ -42,7 +42,7 @@ protobuf.load("vphys.proto", function(err, root) {
 });
 
 var last_sent = +new Date();
-
+var firstsend=true;
 function deviceMotionHandler(eventData) {
 	acceleration = eventData.accelerationIncludingGravity;
 	
@@ -55,10 +55,14 @@ function deviceMotionHandler(eventData) {
 	
 	var payload = { x: acceleration.x, y: acceleration.y, z: acceleration.z, i: eventData.interval };
 	
-	document.getElementById("msg2").textContent =JSON.stringify(payload,undefined, '4');
+	document.getElementById("msg2").textContent =JSON.stringify(payload,undefined, '\t');
 	
 	var message = messager.create(payload); 
 	var buffer = messager.encode(message).finish();
+	if (firstsend) {
+		firstsend=false;
+		document.getElementById("msg").innerHTML="";	
+	};
 	if (!socket.send(buffer)) {
 		//TODO: spammy
 		document.getElementById("msg").innerHTML="ERROR";
@@ -66,18 +70,40 @@ function deviceMotionHandler(eventData) {
 }
 
 function Start() {
-
+	var keepalive = Math.round(new Date().getTime()/1000);
   let serverid = parseInt(queryDict["serverid"]);
   if (isNaN(serverid)) {
 	document.getElementById("msg").innerHTML="server id undefined";
 	return;
   };
   
-  let url = "/meta"+serverid+"vphysrelay/";
+  let nonce = parseInt(queryDict["nonce"]);
+  let now = Math.round(new Date().getTime()/1000);
+  
+  if (isNaN(nonce) || (now-nonce)>60*15) {
+	document.getElementById("msg").innerHTML='<a href="https://qrcodescan.in/">Read the QR code</a>';
+	return;
+  };
+  
+	
+  let url = "/meta"+serverid+"vphys/";
   console.log("connecting to "+url);
   
   socket = new WuSocket(url);
+	
+	document.getElementById("msg").innerHTML="Attempting to connect...";
+	
   socket.onopen = function() {
+  
+		setInterval(function() {
+		  let payload = "A";
+		  socket.send(payload);
+			if ((Math.round(new Date().getTime()/1000)-keepalive)>7) {
+				document.getElementById("msg").innerHTML='<h2 style="color: #ee1111;">Network failure, please refresh page!</h2>';
+			};
+		}, 789);
+  
+		document.getElementById("msg").innerHTML="Connecting to accelerometer";
 		if (window.DeviceMotionEvent) {
 		  
 		  
@@ -97,6 +123,10 @@ function Start() {
 
   socket.onmessage = function(evt) {
     let data = evt.data;
+	if (data=="A") {
+		keepalive = Math.round(new Date().getTime()/1000);
+		return;
+	};
     document.getElementById("msg").innerHTML=data;
   };
 }
@@ -125,7 +155,8 @@ function safarihacks() {
 
 </script>
 <body>
-<div id="msg"></div>
+<h1>VPhys Mobile Control Systems</h1>
+<div id="msg">Unknown error?</div>
 <pre id="msg2"></pre>
 </body>
 </html>
