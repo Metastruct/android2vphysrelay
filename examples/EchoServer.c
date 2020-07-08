@@ -69,7 +69,7 @@ int main(int argc, char ** argv) {
 	printf("Started listening\n");
 	for (;;) {
 		WuEvent evt;
-		while (WuHostServe(host, & evt, 0)) {
+		while (WuHostServe(host, & evt, 50)) {
 			switch (evt.type) {
 			case WuEvent_ClientJoin:
 				{
